@@ -11,15 +11,15 @@ import logging
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG,
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  #  Секретный ключ для сессий Flask
+app.secret_key = os.urandom(24)  # Секретный ключ для сессий Flask
 
 # Глобальные экземпляры AI
-cfr_agent = None  #  Инициализируем, но создаем, только если нужен MCCFR
-random_agent = RandomAgent()  #  Для случайных ходов
+cfr_agent = None  # Инициализируем, но создаем, только если нужен MCCFR
+random_agent = RandomAgent()  # Для случайных ходов
 
 def initialize_ai_agent(ai_settings):
     """Инициализирует AI агента (CFR или Random) на основе настроек."""
@@ -37,7 +37,7 @@ def initialize_ai_agent(ai_settings):
         cfr_agent = CFRAgent(iterations=iterations, stop_threshold=stop_threshold)
         logger.info(f"AI агент MCCFR инициализирован: {cfr_agent}")
 
-        if os.environ.get("AI_PROGRESS_TOKEN"):  #  Если задан токен GitHub
+        if os.environ.get("AI_PROGRESS_TOKEN"):  # Если задан токен GitHub
             try:
                 # Загрузка с GitHub
                 logger.info("Попытка загрузить прогресс AI с GitHub...")
@@ -81,7 +81,7 @@ def serialize_move(move):
 def home():
     """Главная страница (не используется в данном приложении)."""
     logger.debug("Обработка запроса главной страницы")
-    return render_template('index.html')  #  Предполагается, что есть index.html
+    return render_template('index.html')  # Предполагается, что есть index.html
 
 @app.route('/training')
 def training():
@@ -104,7 +104,7 @@ def training():
             'iterations': '100000',
             'stopThreshold': '0.0001',
             'aiType': 'mccfr',
-            'placementMode': 'standard'  #  Убрал, т.к. это внутренняя логика
+            'placementMode': 'standard'  # Убрал, т.к. это внутренняя логика
         }
     }
     logger.info(f"Инициализировано состояние игры: {session['game_state']}")
@@ -112,7 +112,7 @@ def training():
     # Проверка необходимости реинициализации AI (только если изменились настройки)
     if session.get('previous_ai_settings') != session['game_state']['ai_settings']:
         initialize_ai_agent(session['game_state']['ai_settings'])
-        session['previous_ai_settings'] = session['game_state']['ai_settings'].copy()  #  Важно: копируем!
+        session['previous_ai_settings'] = session['game_state']['ai_settings'].copy()  # Важно: копируем!
         logger.info(f"Реинициализирован AI агент с настройками: {session['game_state']['ai_settings']}")
 
     logger.info(f"Текущее состояние игры в сессии: {session['game_state']}")
@@ -143,7 +143,7 @@ def update_state():
 
         # Обновление доски - сохраняем существующие карты
         if 'board' in game_state:
-            current_board = session['game_state'].get('board', {  #  Используем .get()
+            current_board = session['game_state'].get('board', {  # Используем .get()
                 'top': [None] * 3,
                 'middle': [None] * 5,
                 'bottom': [None] * 5
@@ -153,9 +153,9 @@ def update_state():
             for line in ['top', 'middle', 'bottom']:
                 if line in game_state['board']:
                     new_line = game_state['board'][line]
-                    current_line = current_board.get(line, []) #  Используем .get()
+                    current_line = current_board.get(line, []) # Используем .get()
                     for i, new_card in enumerate(new_line):
-                        if i < len(current_line):  #  Проверяем индекс
+                        if i < len(current_line):  # Проверяем индекс
                             if new_card is not None:
                                 # Важно: преобразуем словарь в объект Card
                                 current_line[i] = Card.from_dict(new_card) if isinstance(new_card, dict) else None
@@ -176,11 +176,11 @@ def update_state():
         # Добавляем карты, удаленные через "-", в discarded_cards
         if 'removed_cards' in game_state:
             removed_cards = [Card.from_dict(card) if isinstance(card, dict) else card for card in game_state['removed_cards']]
-            #  Удаляем дубликаты, на случай, если карта уже была в discarded_cards
+            # Удаляем дубликаты, на случай, если карта уже была в discarded_cards
             session['game_state']['discarded_cards'] = list(set(session['game_state']['discarded_cards'] + [card.to_dict() for card in removed_cards]))
             logger.debug(f"removed_cards добавлены в discarded_cards сессии: {session['game_state']['discarded_cards']}")
 
-            #  Удаляем удаленные карты из selected_cards (если они там есть)
+            # Удаляем удаленные карты из selected_cards (если они там есть)
             session['game_state']['selected_cards'] = [
                 card for card in session['game_state']['selected_cards']
                 if card.to_dict() not in [removed_card.to_dict() for removed_card in removed_cards]
@@ -192,7 +192,7 @@ def update_state():
             if game_state.get('ai_settings') != session.get('previous_ai_settings'):
                 logger.info("Настройки AI изменились, реинициализация агента")
                 initialize_ai_agent(game_state['ai_settings'])
-                session['previous_ai_settings'] = game_state.get('ai_settings', {}).copy() #  Важно: копируем!
+                session['previous_ai_settings'] = game_state.get('ai_settings', {}).copy() # Важно: копируем!
 
         logger.debug(f"Состояние сессии ПОСЛЕ обновления: {session['game_state']}")
         logger.debug("Обработка запроса обновления состояния - END")
@@ -217,7 +217,7 @@ def ai_move():
 
     num_cards = len(game_state_data.get('selected_cards', []))
     ai_settings = game_state_data.get('ai_settings', {})
-    ai_type = ai_settings.get('aiType', 'mccfr') #  'mccfr' по умолчанию
+    ai_type = ai_settings.get('aiType', 'mccfr') # 'mccfr' по умолчанию
 
     try:
         # Обработка и валидация данных (используем .get() с значениями по умолчанию)
@@ -229,7 +229,7 @@ def ai_move():
         for line in ['top', 'middle', 'bottom']:
             line_data = board_data.get(line, [])
             for card_data in line_data:
-                if card_data:  #  Проверяем, что card_data не None
+                if card_data:  # Проверяем, что card_data не None
                     board.place_card(line, Card.from_dict(card_data))
         logger.debug(f"Обработанная доска: {board}")
 
@@ -239,7 +239,7 @@ def ai_move():
             board=board,
             discarded_cards=discarded_cards,
             ai_settings=ai_settings,
-            deck=ai_engine.Card.get_all_cards() #  Передаем полную колоду
+            deck=ai_engine.Card.get_all_cards() # Передаем полную колоду
         )
         logger.debug(f"Создано состояние игры: {game_state}")
 
@@ -251,7 +251,7 @@ def ai_move():
             total_royalty = sum(royalties.values())
             logger.info(f"Игра окончена. Выплата: {payoff}, Роялти: {royalties}, Всего: {total_royalty}")
 
-            #  Сохранение прогресса AI (для MCCFR) *перед* отправкой ответа
+            # Сохранение прогресса AI (для MCCFR) *перед* отправкой ответа
             if cfr_agent and ai_settings.get('aiType') == 'mccfr':
                 try:
                     cfr_agent.save_progress()
@@ -276,7 +276,7 @@ def ai_move():
 
         # Выбор AI агента
         if ai_type == 'mccfr':
-            if cfr_agent is None:  #  Проверяем, инициализирован ли агент
+            if cfr_agent is None:  # Проверяем, инициализирован ли агент
                 logger.error("Ошибка: MCCFR агент не инициализирован")
                 return jsonify({'error': 'MCCFR agent not initialized'}), 500
             ai_thread = Thread(target=cfr_agent.get_move, args=(game_state, timeout_event, result))
@@ -287,11 +287,11 @@ def ai_move():
             return jsonify({'error': f'Unknown AI agent type: {ai_type}'}), 400
 
         ai_thread.start()
-        ai_thread.join(timeout=int(ai_settings.get('aiTime', 5)))  #  Таймаут из настроек
+        ai_thread.join(timeout=int(ai_settings.get('aiTime', 5)))  # Таймаут из настроек
 
         if ai_thread.is_alive():
             timeout_event.set()
-            ai_thread.join()  #  Ожидаем завершения потока
+            ai_thread.join()  # Ожидаем завершения потока
             logger.warning("Время ожидания хода AI истекло")
             return jsonify({'error': 'AI move timed out'}), 504
 
@@ -301,7 +301,7 @@ def ai_move():
             logger.error(f"Ошибка хода AI: {move.get('error', 'Unknown error')}")
             return jsonify({'error': move.get('error', 'Unknown error')}), 500
 
-        #  Применяем ход к копии состояния игры *перед* расчетом роялти
+        # Применяем ход к копии состояния игры *перед* расчетом роялти
         next_game_state = game_state.apply_action(move)
         royalties = next_game_state.calculate_royalties()
         total_royalty = sum(royalties.values())
