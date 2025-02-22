@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 # GitHub repository settings (can be overridden by environment variables)
 GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME") or "Azerus96"
-GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY") or "gemiprofc"
+GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY") or "deeprofc"
 AI_PROGRESS_FILENAME = "cfr_data.pkl"
 
 def save_ai_progress_to_github(filename=AI_PROGRESS_FILENAME):
