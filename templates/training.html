@@ -452,7 +452,7 @@
         let selectedSuit = null;
         let isFullscreen = false;
         let unavailableCards = new Set();
-        let discardedCards = new Set(); // Добавлено для отслеживания discarded_cards
+        let discardedCards = new Set(); // Для отслеживания карт, удалённых кнопкой "-"
 
         document.addEventListener('fullscreenchange', () => {
             isFullscreen = !!document.fullscreenElement;
@@ -466,11 +466,11 @@
         }
 
         document.addEventListener('click', (e) => {
-          const menu = document.querySelector('.menu-panel');
-          const menuToggle = document.querySelector('.menu-toggle');
-          if (menuOpen && !menu.contains(e.target) && !menuToggle.contains(e.target)) {
-            toggleMenu();
-          }
+            const menu = document.querySelector('.menu-panel');
+            const menuToggle = document.querySelector('.menu-toggle');
+            if (menuOpen && !menu.contains(e.target) && !menuToggle.contains(e.target)) {
+                toggleMenu();
+            }
         });
 
         function toggleFullScreen() {
@@ -536,7 +536,7 @@
             const combinationArea = document.getElementById('combination-area');
             combinationArea.innerHTML = '';
             unavailableCards.clear();
-            discardedCards.clear(); // Очищаем discarded_cards при сбросе
+            discardedCards.clear();
 
             for (let i = 0; i < 17; i++) {
                 const slot = document.createElement('div');
@@ -686,22 +686,22 @@
             }
 
             if (selectedRank && selectedSuit) {
-              const cardKey = `${selectedRank}${selectedSuit}`;
-              if (!unavailableCards.has(cardKey) && !discardedCards.has(cardKey)) {
-                const combinationArea = document.getElementById('combination-area');
-                const emptySlot = combinationArea.querySelector('.combination-slot:not(.taken)');
-                if (emptySlot) {
-                  const card = createCard({ rank: selectedRank, suit: selectedSuit });
-                  emptySlot.appendChild(card);
-                  unavailableCards.add(cardKey);
-                  emptySlot.classList.add('taken');
+                const cardKey = `${selectedRank}${selectedSuit}`;
+                if (!unavailableCards.has(cardKey) && !discardedCards.has(cardKey)) {
+                    const combinationArea = document.getElementById('combination-area');
+                    const emptySlot = combinationArea.querySelector('.combination-slot:not(.taken)');
+                    if (emptySlot) {
+                        const card = createCard({ rank: selectedRank, suit: selectedSuit });
+                        emptySlot.appendChild(card);
+                        unavailableCards.add(cardKey);
+                        emptySlot.classList.add('taken');
 
-                  selectedRank = null;
-                  selectedSuit = null;
-                  document.querySelectorAll('.selector-item').forEach(el => el.classList.remove('selected'));
-                  updateSelectorAvailability();
+                        selectedRank = null;
+                        selectedSuit = null;
+                        document.querySelectorAll('.selector-item').forEach(el => el.classList.remove('selected'));
+                        updateSelectorAvailability();
+                    }
                 }
-              }
             }
         }
 
@@ -755,7 +755,7 @@
                     },
                     body: requestData
                 })
-               .then(response => {
+                .then(response => {
                     console.log("distributeCards() - Ответ сервера статус:", response.status);
                     if (!response.ok) {
                         return response.text().then(text => {
@@ -820,7 +820,6 @@
             updateSelectorAvailability();
 
             if (slotsChanged && removedCards.length > 0) {
-                fillCombinationSlots(); // Заполняем освободившиеся слоты
                 fetch('/update_state', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -860,7 +859,7 @@
             resetCombinationArea();
 
             unavailableCards.clear();
-            discardedCards.clear(); // Очищаем discarded_cards при сбросе
+            discardedCards.clear();
             selectedRank = null;
             selectedSuit = null;
             document.querySelectorAll('.selector-item').forEach(el => el.classList.remove('selected', 'unavailable'));
@@ -1043,7 +1042,6 @@
             const cardKey = `${cardData.rank}${cardData.suit}`;
             if (unavailableCards.has(cardKey) && cardData.source === 'combination') {
                 unavailableCards.delete(cardKey);
-                discardedCards.add(cardKey); // Добавляем в discarded_cards
                 updateSelectorAvailability();
 
                 let removedCard = null;
@@ -1059,13 +1057,13 @@
                     fillCombinationSlots();
                 }
 
-                // Отправляем обновление состояния на сервер
+                // Не добавляем в discardedCards, так как двойной клик не удаляет карту из колоды
                 fetch('/update_state', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ...getGameStateFromDOM(),
-                        removed_cards: [{ rank: cardData.rank, suit: cardData.suit }],
+                        removed_cards: [], // Не отправляем removed_cards для двойного клика
                         ai_settings: getAiSettings()
                     })
                 })
