@@ -2,6 +2,7 @@ from github import Github, GithubException
 import os
 import base64
 import logging
+from typing import Optional
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -11,10 +12,25 @@ GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME") or "Azerus96"
 GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY") or "deeprofc"
 AI_PROGRESS_FILENAME = "cfr_data.pkl"
 
-def save_ai_progress_to_github(filename=AI_PROGRESS_FILENAME):
+
+def save_ai_progress_to_github(filename: str = AI_PROGRESS_FILENAME) -> bool:
+    """
+    Saves AI progress file to GitHub repository.
+
+    Args:
+        filename (str): Name of the file to save. Defaults to AI_PROGRESS_FILENAME.
+
+    Returns:
+        bool: True if save was successful, False otherwise.
+    """
     token = os.environ.get("AI_PROGRESS_TOKEN")
     if not token:
         logger.warning("AI_PROGRESS_TOKEN not set. Progress saving to GitHub disabled.")
+        return False
+
+    # Проверка существования локального файла
+    if not os.path.exists(filename):
+        logger.error(f"Local file {filename} does not exist. Cannot save to GitHub.")
         return False
 
     try:
@@ -23,35 +39,51 @@ def save_ai_progress_to_github(filename=AI_PROGRESS_FILENAME):
 
         try:
             contents = repo.get_contents(filename, ref="main")
-            # Используем 'with' для автоматического закрытия файла
-            with open(filename, 'rb') as f:
+            with open(filename, "rb") as f:
                 content = f.read()
-            # Нет необходимости в .decode('utf-8') после base64.b64encode()
-            repo.update_file(contents.path, "Update AI progress", base64.b64encode(content), contents.sha, branch="main")
-            logger.info(f"AI progress saved to GitHub: {GITHUB_REPOSITORY}/{filename}")
+            repo.update_file(
+                contents.path,
+                "Update AI progress",
+                base64.b64encode(content),
+                contents.sha,
+                branch="main",
+            )
+            logger.info(f"AI progress updated on GitHub: {GITHUB_REPOSITORY}/{filename}")
             return True
         except GithubException as e:
             if e.status == 404:
-                # Используем 'with' для автоматического закрытия файла
-                with open(filename, 'rb') as f:
+                with open(filename, "rb") as f:
                     content = f.read()
-                # Нет необходимости в .decode('utf-8') после base64.b64encode()
-                repo.create_file(filename, "Initial AI progress", base64.b64encode(content), branch="main")
+                repo.create_file(
+                    filename,
+                    "Initial AI progress",
+                    base64.b64encode(content),
+                    branch="main",
+                )
                 logger.info(f"Created new file for AI progress on GitHub: {GITHUB_REPOSITORY}/{filename}")
                 return True
             else:
-                logger.error(f"Error saving progress to GitHub (other than 404): {e}")
+                logger.error(f"GitHub API error saving progress: status={e.status}, data={e.data}")
                 return False
 
     except GithubException as e:
-        logger.error(f"Error saving progress to GitHub: {e}")
+        logger.error(f"GitHub API error saving progress: status={e.status}, data={e.data}")
         return False
     except Exception as e:
-        logger.exception(f"An unexpected error occurred during saving: {e}")
+        logger.exception(f"Unexpected error during saving to GitHub: {e}")
         return False
 
 
-def load_ai_progress_from_github(filename=AI_PROGRESS_FILENAME):
+def load_ai_progress_from_github(filename: str = AI_PROGRESS_FILENAME) -> bool:
+    """
+    Loads AI progress file from GitHub repository.
+
+    Args:
+        filename (str): Name of the file to load. Defaults to AI_PROGRESS_FILENAME.
+
+    Returns:
+        bool: True if load was successful, False otherwise.
+    """
     token = os.environ.get("AI_PROGRESS_TOKEN")
     if not token:
         logger.warning("AI_PROGRESS_TOKEN not set. Progress loading from GitHub disabled.")
@@ -62,19 +94,18 @@ def load_ai_progress_from_github(filename=AI_PROGRESS_FILENAME):
         repo = g.get_user(GITHUB_USERNAME).get_repo(GITHUB_REPOSITORY)
         contents = repo.get_contents(filename, ref="main")
         file_content = base64.b64decode(contents.content)
-        # Используем 'with' для автоматического закрытия файла
-        with open(filename, 'wb') as f:
+        with open(filename, "wb") as f:
             f.write(file_content)
         logger.info(f"AI progress loaded from GitHub: {GITHUB_REPOSITORY}/{filename}")
         return True
 
     except GithubException as e:
         if e.status == 404:
-            logger.info("Progress file not found in GitHub repository.")
+            logger.info(f"Progress file {filename} not found in GitHub repository.")
             return False
         else:
-            logger.error(f"Error loading progress from GitHub: {e}")
+            logger.error(f"GitHub API error loading progress: status={e.status}, data={e.data}")
             return False
     except Exception as e:
-        logger.exception(f"An unexpected error occurred during loading: {e}")
+        logger.exception(f"Unexpected error during loading from GitHub: {e}")
         return False
