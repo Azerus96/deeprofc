@@ -180,9 +180,19 @@ class GameState:
         for line in [self.board.top, self.board.middle, self.board.bottom]:
             used_cards.update([card for card in line if card is not None])
         used_cards.update(self.discarded_cards)
+        
+        # Определяем, какие слоты свободны
+        free_slots = {
+            "top": [i for i in range(3) if i >= len(self.board.top)],
+            "middle": [i for i in range(5) if i >= len(self.board.middle)],
+            "bottom": [i for i in range(5) if i >= len(self.board.bottom)]
+        }
+        
+        total_free_slots = len(free_slots["top"]) + len(free_slots["middle"]) + len(free_slots["bottom"])
 
         if num_cards > 0:
             try:
+                # Режим фантазии
                 if self.ai_settings.get("fantasyMode", False):
                     valid_fantasy_repeats = []
                     for p in itertools.permutations(self.selected_cards.cards):
@@ -214,48 +224,96 @@ class GameState:
                             key=lambda a: self.calculate_action_royalty(a),
                             reverse=True,
                         )
-
+                
+                # Особый случай: ровно 3 карты - всегда размещаем 2, сбрасываем 1
                 elif num_cards == 3:
                     for discarded_index in range(3):
                         remaining_cards = [
                             card for i, card in enumerate(self.selected_cards.cards) if i != discarded_index
                         ]
-                        for top_count in range(min(len(remaining_cards) + 1, 3 - len(self.board.top))):
-                            for middle_count in range(
-                                min(len(remaining_cards) - top_count + 1, 5 - len(self.board.middle))
-                            ):
-                                bottom_count = len(remaining_cards) - top_count - middle_count
-                                if bottom_count <= (5 - len(self.board.bottom)):
-                                    action = {
-                                        "top": remaining_cards[:top_count],
-                                        "middle": remaining_cards[top_count : top_count + middle_count],
-                                        "bottom": remaining_cards[top_count + middle_count :],
-                                        "discarded": [self.selected_cards.cards[discarded_index]],
-                                    }
-                                    actions.append(action)
+                        
+                        # Генерируем все возможные размещения 2 карт по свободным слотам
+                        for placement in self._generate_placements_for_free_slots(remaining_cards, free_slots):
+                            action = {
+                                "top": placement["top"],
+                                "middle": placement["middle"],
+                                "bottom": placement["bottom"],
+                                "discarded": [self.selected_cards.cards[discarded_index]]
+                            }
+                            actions.append(action)
+                
+                # Общий случай
                 else:
                     remaining_cards = list(self.selected_cards.cards)
-                    for top_count in range(min(len(remaining_cards) + 1, 3 - len(self.board.top))):
-                        for middle_count in range(
-                            min(len(remaining_cards) - top_count + 1, 5 - len(self.board.middle))
-                        ):
-                            bottom_count = len(remaining_cards) - top_count - middle_count
-                            if bottom_count <= (5 - len(self.board.bottom)):
+                    
+                    # Если у нас больше карт, чем свободных слотов, нужно выбрать, какие разместить
+                    if num_cards > total_free_slots:
+                        for cards_to_place in itertools.combinations(remaining_cards, total_free_slots):
+                            cards_to_discard = [card for card in remaining_cards if card not in cards_to_place]
+                            
+                            # Генерируем все возможные размещения выбранных карт по свободным слотам
+                            for placement in self._generate_placements_for_free_slots(list(cards_to_place), free_slots):
                                 action = {
-                                    "top": remaining_cards[:top_count],
-                                    "middle": remaining_cards[top_count : top_count + middle_count],
-                                    "bottom": remaining_cards[top_count + middle_count :],
-                                    "discarded": [],
+                                    "top": placement["top"],
+                                    "middle": placement["middle"],
+                                    "bottom": placement["bottom"],
+                                    "discarded": cards_to_discard
                                 }
                                 actions.append(action)
-
+                    
+                    # Если у нас ровно столько карт, сколько свободных слотов, или меньше
+                    else:
+                        for placement in self._generate_placements_for_free_slots(remaining_cards, free_slots):
+                            action = {
+                                "top": placement["top"],
+                                "middle": placement["middle"],
+                                "bottom": placement["bottom"],
+                                "discarded": []
+                            }
+                            actions.append(action)
+            
             except Exception as e:
                 logger.exception(f"Error in get_actions: {e}")
                 return []
-
-        logger.debug(f"Generated actions: {actions}")
+        
+        logger.debug(f"Generated {len(actions)} actions")
         logger.debug("get_actions - END")
         return actions
+
+    def _generate_placements_for_free_slots(self, cards: List[Card], free_slots: Dict[str, List[int]]) -> List[Dict[str, List[Card]]]:
+        """Generates all valid placements of cards in free slots."""
+        if not cards:
+            return [{"top": [], "middle": [], "bottom": []}]
+        
+        placements = []
+        
+        # Рекурсивно генерируем все возможные размещения карт по свободным слотам
+        def backtrack(index: int, current_placement: Dict[str, List[Card]]):
+            if index == len(cards):
+                # Проверяем, что размещение соответствует правилам игры
+                temp_board = Board()
+                temp_board.top = self.board.top + current_placement["top"]
+                temp_board.middle = self.board.middle + current_placement["middle"]
+                temp_board.bottom = self.board.bottom + current_placement["bottom"]
+                
+                temp_state = GameState(board=temp_board, ai_settings=self.ai_settings)
+                if not temp_state.is_dead_hand():
+                    placements.append({
+                        "top": current_placement["top"][:],
+                        "middle": current_placement["middle"][:],
+                        "bottom": current_placement["bottom"][:]
+                    })
+                return
+            
+            # Пробуем разместить текущую карту в каждой линии
+            for line in ["top", "middle", "bottom"]:
+                if len(current_placement[line]) < len(free_slots[line]):
+                    current_placement[line].append(cards[index])
+                    backtrack(index + 1, current_placement)
+                    current_placement[line].pop()
+        
+        backtrack(0, {"top": [], "middle": [], "bottom": []})
+        return placements
 
     def is_valid_fantasy_entry(self, action: Dict[str, List[Card]]) -> bool:
         """Checks if an action leads to a valid fantasy mode entry."""
