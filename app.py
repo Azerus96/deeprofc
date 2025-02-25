@@ -192,13 +192,15 @@ def update_state():
                 Card.from_dict(card) if isinstance(card, dict) else card
                 for card in game_state["removed_cards"]
             ]
-            # Удаляем дубликаты, на случай, если карта уже была в discarded_cards
-            session["game_state"]["discarded_cards"] = list(
-                set(
-                    session["game_state"]["discarded_cards"]
-                    + [card.to_dict() for card in removed_cards]
-                )
-            )
+            
+            # Исправление: преобразуем карты в строковое представление для сравнения
+            discarded_cards_str = [str(card) for card in session["game_state"].get("discarded_cards", [])]
+            
+            # Добавляем только новые карты
+            for card in removed_cards:
+                if str(card) not in discarded_cards_str:
+                    session["game_state"].setdefault("discarded_cards", []).append(card)
+            
             logger.debug(
                 f"removed_cards добавлены в discarded_cards сессии: {session['game_state']['discarded_cards']}"
             )
@@ -206,8 +208,8 @@ def update_state():
             # Удаляем удаленные карты из selected_cards (если они там есть)
             session["game_state"]["selected_cards"] = [
                 card
-                for card in session["game_state"]["selected_cards"]
-                if card.to_dict() not in [removed_card.to_dict() for removed_card in removed_cards]
+                for card in session["game_state"].get("selected_cards", [])
+                if str(card) not in [str(removed_card) for removed_card in removed_cards]
             ]
 
         if "ai_settings" in game_state:
