@@ -44,7 +44,7 @@ def save_ai_progress_to_github(filename: str = AI_PROGRESS_FILENAME) -> bool:
             repo.update_file(
                 contents.path,
                 "Update AI progress",
-                base64.b64encode(content),
+                content,  # PyGithub автоматически обрабатывает бинарные данные
                 contents.sha,
                 branch="main",
             )
@@ -57,7 +57,7 @@ def save_ai_progress_to_github(filename: str = AI_PROGRESS_FILENAME) -> bool:
                 repo.create_file(
                     filename,
                     "Initial AI progress",
-                    base64.b64encode(content),
+                    content,  # PyGithub автоматически обрабатывает бинарные данные
                     branch="main",
                 )
                 logger.info(f"Created new file for AI progress on GitHub: {GITHUB_REPOSITORY}/{filename}")
