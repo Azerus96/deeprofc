@@ -300,6 +300,35 @@ def ai_move():
                 "game_over": True
             }), 200
         
+        # Получаем доступные ходы
+        actions = game_state.get_actions()
+        
+        # Если нет доступных ходов, но игра не в терминальном состоянии,
+        # считаем это завершением игры
+        if not actions:
+            logger.info("Нет доступных ходов, но игра не в терминальном состоянии. Считаем игру завершенной.")
+            royalties = game_state.calculate_royalties()
+            total_royalty = sum(royalties.values())
+            
+            # Сохранение прогресса AI (для MCCFR)
+            if cfr_agent and ai_settings.get("aiType") == "mccfr":
+                try:
+                    cfr_agent.save_progress()
+                    logger.info("Прогресс AI сохранен локально.")
+                    if github_utils.save_ai_progress_to_github():  # Попытка сохранить на GitHub
+                        logger.info("Прогресс AI сохранен на GitHub.")
+                    else:
+                        logger.warning("Не удалось сохранить прогресс AI на GitHub.")
+                except Exception as e:
+                    logger.error(f"Ошибка сохранения прогресса AI: {e}")
+            
+            return jsonify({
+                "message": "Game over - no more valid moves",
+                "royalties": royalties,
+                "total_royalty": total_royalty,
+                "game_over": True
+            }), 200
+        
         # Если игра не завершена, получаем ход AI
         timeout_event = Event()
         result = {"move": None}
