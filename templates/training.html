@@ -272,6 +272,11 @@
             background-color: rgba(76,175,80,0.1);
         }
 
+        .combination-slot.selected {
+            border: 2px solid #ff5555;
+            background-color: rgba(255,85,85,0.1);
+        }
+
         .fullscreen-btn {
             position: fixed;
             top: 10px;
@@ -537,12 +542,24 @@
             combinationArea.innerHTML = '';
             unavailableCards.clear();
             // Не очищаем discardedCards, чтобы сохранить состояние удаленных карт
-            // discardedCards.clear();
 
             for (let i = 0; i < 17; i++) {
                 const slot = document.createElement('div');
                 slot.className = 'combination-slot';
                 slot.classList.remove('taken');
+                
+                // Добавляем обработчик клика для выбора слота
+                slot.addEventListener('click', function(e) {
+                    if (slot.classList.contains('taken')) {
+                        // Снимаем выделение со всех слотов
+                        document.querySelectorAll('.combination-slot').forEach(s => 
+                            s.classList.remove('selected'));
+                        // Выделяем текущий слот
+                        slot.classList.add('selected');
+                        e.stopPropagation();
+                    }
+                });
+                
                 slot.addEventListener('dragover', (e) => e.preventDefault());
                 slot.addEventListener('drop', handleCombinationSlotDrop);
                 combinationArea.appendChild(slot);
@@ -685,276 +702,37 @@
                 }
             } else if (element.dataset.suit) {
                 if (selectedSuit === element.dataset.suit) {
-            selectedSuit = null;
-            element.classList.remove('selected');
-        } else {
-            document.querySelectorAll('[data-suit]').forEach(el => el.classList.remove('selected'));
-            selectedSuit = element.dataset.suit;
-            element.classList.add('selected');
-        }
-    }
-
-    if (selectedRank && selectedSuit) {
-        const cardKey = `${selectedRank}${selectedSuit}`;
-        if (!unavailableCards.has(cardKey) && !discardedCards.has(cardKey)) {
-            const combinationArea = document.getElementById('combination-area');
-            const emptySlot = Array.from(combinationArea.querySelectorAll('.combination-slot')).find(slot => !slot.querySelector('.card'));
-            if (emptySlot) {
-                const card = createCard({ rank: selectedRank, suit: selectedSuit });
-                emptySlot.appendChild(card);
-                unavailableCards.add(cardKey);
-                emptySlot.classList.add('taken');
-
-                selectedRank = null;
-                selectedSuit = null;
-                document.querySelectorAll('.selector-item').forEach(el => el.classList.remove('selected'));
-                updateSelectorAvailability();
-            }
-        }
-    }
-}
-
-function getAiSettings() {
-    return {
-        fantasyType: document.getElementById('fantasyType').value,
-        fantasyMode: document.getElementById('fantasyMode').checked,
-        aiTime: document.getElementById('aiTime').value,
-        iterations: document.getElementById('iterations').value,
-        stopThreshold: document.getElementById('stopThreshold').value,
-        aiType: document.getElementById('aiType').value,
-        placementMode: 'standard'
-    };
-}
-
-function distributeCards() {
-    console.log("distributeCards() - Начало");
-    const gameState = getGameStateFromDOM();
-    const numCards = gameState.selected_cards.length;
-    const isFantasyMode = document.getElementById('fantasyMode').checked;
-    const isFirstDeal = gameState.board.top.every(c => c === null) && gameState.board.middle.every(c => c === null) && gameState.board.bottom.every(c => c === null);
-
-    // Сохраняем текущие discardedCards
-    const currentDiscardedCards = new Set(discardedCards);
-
-    let placementMode;
-    if (isFirstDeal && numCards === 5) {
-        placementMode = "first_deal";
-    } else if (numCards === 3) {
-        placementMode = "standard";
-    } else if (isFantasyMode && numCards > 3) {
-        placementMode = "fantasy";
-    } else {
-        placementMode = "free";
-    }
-    console.log("distributeCards() - Режим размещения:", placementMode);
-
-    if (numCards > 0) {
-        console.log("distributeCards() - Вызов ИИ для распределения карт");
-        const aiSettings = getAiSettings();
-
-        const requestData = JSON.stringify({
-            selected_cards: gameState.selected_cards,
-            board: gameState.board,
-            discarded_cards: gameState.discarded_cards,
-            ai_settings: aiSettings
-        });
-        console.log("distributeCards() - Отправка данных на /ai_move:", requestData);
-
-        fetch('/ai_move', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: requestData
-        })
-        .then(response => {
-            console.log("distributeCards() - Ответ сервера статус:", response.status);
-            if (!response.ok) {
-                return response.text().then(text => {
-                    console.error(`distributeCards() - HTTP ошибка! статус: ${response.status}, текст: ${text}`);
-                    throw new Error(`HTTP error! status: ${response.status}, text: ${text}`);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log("distributeCards() - Ответ сервера данные:", data);
-            if (data.error) {
-                alert(data.error);
-                return;
+                    selectedSuit = null;
+                    element.classList.remove('selected');
+                } else {
+                    document.querySelectorAll('[data-suit]').forEach(el => el.classList.remove('selected'));
+                    selectedSuit = element.dataset.suit;
+                    element.classList.add('selected');
+                }
             }
 
-            // Добавляем все карты из хода в discardedCards
-            if (data.move) {
-                for (const line in data.move) {
-                    if (Array.isArray(data.move[line])) {
-                        data.move[line].forEach(card => {
-                            if (card) {
-                                const cardKey = `${card.rank}${card.suit}`;
-                                discardedCards.add(cardKey);
-                            }
-                        });
+            if (selectedRank && selectedSuit) {
+                const cardKey = `${selectedRank}${selectedSuit}`;
+                if (!unavailableCards.has(cardKey) && !discardedCards.has(cardKey)) {
+                    const combinationArea = document.getElementById('combination-area');
+                    const emptySlot = Array.from(combinationArea.querySelectorAll('.combination-slot')).find(slot => !slot.querySelector('.card'));
+                    if (emptySlot) {
+                        const card = createCard({ rank: selectedRank, suit: selectedSuit });
+                        emptySlot.appendChild(card);
+                        unavailableCards.add(cardKey);
+                        emptySlot.classList.add('taken');
+
+                        selectedRank = null;
+                        selectedSuit = null;
+                        document.querySelectorAll('.selector-item').forEach(el => el.classList.remove('selected'));
+                        updateSelectorAvailability();
                     }
                 }
             }
-
-            placeCardsOnBoard(data.move);
-
-            // Восстанавливаем сохраненные discardedCards
-            currentDiscardedCards.forEach(cardKey => {
-                discardedCards.add(cardKey);
-            });
-
-            // Проверяем, завершена ли игра
-            if (data.game_over) {
-                console.log("distributeCards() - Игра завершена!");
-                
-                // Отображаем роялти только в конце игры
-                if (data.royalties) {
-                    displayRoyalties(data.royalties);
-                }
-                if (data.total_royalty !== undefined) {
-                    displayTotalRoyalty(data.total_royalty);
-                }
-                
-                // Показываем сообщение о завершении игры
-                setTimeout(() => {
-                    alert(`Игра завершена! Общий роялти: ${data.total_royalty}`);
-                }, 500);
-            } else {
-                // Если игра не завершена, очищаем область комбинаций и скрываем роялти
-                resetCombinationArea();
-                // Скрываем все анимации роялти, так как они должны отображаться только в конце игры
-                document.querySelectorAll('.royalty-animation').forEach(el => {
-                    el.classList.remove('show');
-                    el.textContent = '';
-                });
-                document.getElementById('total-royalty').textContent = '';
-            }
-            
-            saveGameStateToSession();
-            gameState.selected_cards = [];
-            console.log("distributeCards() - selected_cards очищены.");
-            
-            // Обновляем доступность селекторов после всех операций
-            updateSelectorAvailability();
-        })
-        .catch(error => {
-            console.error('distributeCards() - Ошибка:', error);
-            alert('Произошла ошибка при получении хода ИИ.');
-        });
-    } else {
-        alert('Пожалуйста, выберите карты для добавления.');
-    }
-    console.log("distributeCards() - Конец.");
-}
-
-function removeSelectedCards() {
-    console.log("removeSelectedCards() - Начало");
-    const combinationArea = document.getElementById('combination-area');
-    const removedCards = [];
-    let slotsChanged = false;
-
-    combinationArea.querySelectorAll('.combination-slot.taken').forEach(slot => {
-        const card = slot.querySelector('.card');
-        if (card) {
-            const cardKey = `${card.dataset.rank}${card.dataset.suit}`;
-            if (unavailableCards.has(cardKey)) {
-                unavailableCards.delete(cardKey);
-            }
-            discardedCards.add(cardKey); // Добавляем в discardedCards и сохраняем до конца игры
-            removedCards.push({ rank: card.dataset.rank, suit: card.dataset.suit });
-            card.remove();
-            slot.classList.remove('taken');
-            slotsChanged = true;
         }
-    });
 
-    // Перераспределяем карты в слотах после удаления
-    if (slotsChanged) {
-        const slots = Array.from(combinationArea.querySelectorAll('.combination-slot'));
-        const cards = Array.from(combinationArea.querySelectorAll('.card'));
-        
-        // Удаляем все карты из слотов
-        cards.forEach(card => card.remove());
-        slots.forEach(slot => slot.classList.remove('taken'));
-        
-        // Добавляем карты обратно в первые слоты
-        cards.forEach((card, index) => {
-            slots[index].appendChild(card);
-            slots[index].classList.add('taken');
-        });
-    }
-
-    updateSelectorAvailability();
-
-    if (slotsChanged && removedCards.length > 0) {
-        fetch('/update_state', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...getGameStateFromDOM(),
-                removed_cards: removedCards,
-                ai_settings: getAiSettings()
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                console.error("Ошибка при обновлении состояния:", data.error);
-                alert("Ошибка при обновлении состояния: " + data.error);
-            } else {
-                console.log("removeSelectedCards() - Сервер: состояние обновлено, удаленные карты:", removedCards);
-            }
-        })
-        .catch(error => {
-            console.error('removeSelectedCards() - Ошибка при обновлении состояния:', error);
-        });
-    } else {
-        console.log("removeSelectedCards() - Карты не выбраны для удаления или нечего удалять.");
-    }
-
-    console.log("removeSelectedCards() - Конец. Карты удалены из комбинации.");
-}
-
-function resetTraining() {
-    console.log("resetTraining() - Начало");
-    setupTable();
-    resetCombinationArea();
-
-    unavailableCards.clear();
-    discardedCards.clear(); // Очищаем discardedCards при сбросе
-    selectedRank = null;
-    selectedSuit = null;
-    document.querySelectorAll('.selector-item').forEach(el => el.classList.remove('selected', 'unavailable'));
-    document.querySelectorAll('.card-slot').forEach(slot => {
-        slot.classList.remove('taken');
-        const card = slot.querySelector('.card');
-        if (card) {
-            card.remove();
-        }
-    });
-
-    document.querySelectorAll('.royalty-animation').forEach(el => {
-        el.classList.remove('show');
-        el.textContent = '';
-    });
-    document.getElementById('total-royalty').textContent = '';
-
-    fetch('/update_state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            selected_cards: [],
-            board: { top: [], middle: [], bottom: [] },
-            discarded_cards: [],
-            removed_cards: [],
-            ai_settings: {
+        function getAiSettings() {
+            return {
                 fantasyType: document.getElementById('fantasyType').value,
                 fantasyMode: document.getElementById('fantasyMode').checked,
                 aiTime: document.getElementById('aiTime').value,
@@ -962,96 +740,326 @@ function resetTraining() {
                 stopThreshold: document.getElementById('stopThreshold').value,
                 aiType: document.getElementById('aiType').value,
                 placementMode: 'standard'
+            };
+        }
+
+        function distributeCards() {
+            console.log("distributeCards() - Начало");
+            const gameState = getGameStateFromDOM();
+            const numCards = gameState.selected_cards.length;
+            const isFantasyMode = document.getElementById('fantasyMode').checked;
+            const isFirstDeal = gameState.board.top.every(c => c === null) && gameState.board.middle.every(c => c === null) && gameState.board.bottom.every(c => c === null);
+
+            // Сохраняем текущие discardedCards
+            const currentDiscardedCards = new Set(discardedCards);
+
+            let placementMode;
+            if (isFirstDeal && numCards === 5) {
+                placementMode = "first_deal";
+            } else if (numCards === 3) {
+                placementMode = "standard";
+            } else if (isFantasyMode && numCards > 3) {
+                placementMode = "fantasy";
+            } else {
+                placementMode = "free";
             }
-        })
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        console.log("resetTraining() - Сервер: Состояние игры успешно сброшено.");
-    })
-    .catch(error => {
-        console.error('resetTraining() - Ошибка сброса состояния игры:', error);
-        alert('Произошла ошибка при сбросе состояния.');
-    });
-    console.log("resetTraining() - Конец. Тренировка сброшена.");
-}
+            console.log("distributeCards() - Режим размещения:", placementMode);
 
-function isCardOnBoard(card) {
-    const board = getGameStateFromDOM().board;
-    for (const line in board) {
-        if (board[line].some(c => c && c.rank === card.rank && c.suit === card.suit)) {
-            return true;
-        }
-    }
-    return false;
-}
+            if (numCards > 0) {
+                console.log("distributeCards() - Вызов ИИ для распределения карт");
+                const aiSettings = getAiSettings();
 
-function displayRoyalties(royalties) {
-    console.log("displayRoyalties() - Начало. royalties:", royalties);
-    const lines = ['top', 'middle', 'bottom'];
-    lines.forEach(line => {
-        const royaltyValue = royalties[line];
-        if (royaltyValue > 0) {
-            const row = document.getElementById(`${line}-row`);
-            const slots = row.querySelectorAll('.card-slot');
-            const lastSlot = slots[slots.length - 1];
-
-            const royaltyAnimation = lastSlot.querySelector('.royalty-animation');
-            if (royaltyAnimation) {
-                royaltyAnimation.textContent = `+${royaltyValue}`;
-                royaltyAnimation.classList.remove('show');
-                requestAnimationFrame(() => {
-                    royaltyAnimation.classList.add('show');
+                const requestData = JSON.stringify({
+                    selected_cards: gameState.selected_cards,
+                    board: gameState.board,
+                    discarded_cards: gameState.discarded_cards,
+                    ai_settings: aiSettings
                 });
+                console.log("distributeCards() - Отправка данных на /ai_move:", requestData);
 
-                setTimeout(() => {
-                    royaltyAnimation.classList.remove('show');
-                }, 3000);
+                fetch('/ai_move', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: requestData
+                })
+                .then(response => {
+                    console.log("distributeCards() - Ответ сервера статус:", response.status);
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            console.error(`distributeCards() - HTTP ошибка! статус: ${response.status}, текст: ${text}`);
+                            throw new Error(`HTTP error! status: ${response.status}, text: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("distributeCards() - Ответ сервера данные:", data);
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    // Добавляем все карты из хода в discardedCards
+                    if (data.move) {
+                        for (const line in data.move) {
+                            if (Array.isArray(data.move[line])) {
+                                data.move[line].forEach(card => {
+                                    if (card) {
+                                        const cardKey = `${card.rank}${card.suit}`;
+                                        discardedCards.add(cardKey);
+                                    }
+                                });
+                            }
+                        }
+                    }
+
+                    placeCardsOnBoard(data.move);
+
+                    // Восстанавливаем сохраненные discardedCards
+                    currentDiscardedCards.forEach(cardKey => {
+                        discardedCards.add(cardKey);
+                    });
+
+                    // Проверяем, завершена ли игра
+                    if (data.game_over) {
+                        console.log("distributeCards() - Игра завершена!");
+                        
+                        // Отображаем роялти только в конце игры
+                        if (data.royalties) {
+                            displayRoyalties(data.royalties);
+                        }
+                        if (data.total_royalty !== undefined) {
+                            displayTotalRoyalty(data.total_royalty);
+                        }
+                        
+                        // Показываем сообщение о завершении игры
+                        setTimeout(() => {
+                            alert(`Игра завершена! Общий роялти: ${data.total_royalty}`);
+                        }, 500);
+                    } else {
+                        // Если игра не завершена, очищаем область комбинаций и скрываем роялти
+                        resetCombinationArea();
+                        // Скрываем все анимации роялти, так как они должны отображаться только в конце игры
+                        document.querySelectorAll('.royalty-animation').forEach(el => {
+                            el.classList.remove('show');
+                            el.textContent = '';
+                        });
+                        document.getElementById('total-royalty').textContent = '';
+                    }
+                    
+                    saveGameStateToSession();
+                    gameState.selected_cards = [];
+                    console.log("distributeCards() - selected_cards очищены.");
+                    
+                    // Обновляем доступность селекторов после всех операций
+                    updateSelectorAvailability();
+                })
+                .catch(error => {
+                    console.error('distributeCards() - Ошибка:', error);
+                    alert('Произошла ошибка при получении хода ИИ.');
+                });
+            } else {
+                alert('Пожалуйста, выберите карты для добавления.');
             }
+            console.log("distributeCards() - Конец.");
         }
-    });
-    console.log("displayRoyalties() - Конец. Роялти отображены.");
-}
 
-function displayTotalRoyalty(totalRoyalty) {
-    console.log("displayTotalRoyalty() - Начало. totalRoyalty:", totalRoyalty);
-    const totalRoyaltyElement = document.getElementById('total-royalty');
-    totalRoyaltyElement.textContent = `Total Royalty: +${totalRoyalty}`;
-    console.log("displayTotalRoyalty() - Конец. Общая роялти отображена.");
-}
-
-function saveGameStateToSession() {
-    console.log("saveGameStateToSession() - Начало");
-    const gameState = getGameStateFromDOM();
-    const aiSettings = {
-        fantasyType: document.getElementById('fantasyType').value,
-        fantasyMode: document.getElementById('fantasyMode').checked,
-        aiTime: document.getElementById('aiTime').value,
-        iterations: document.getElementById('iterations').value,
-        stopThreshold: document.getElementById('stopThreshold').value,
-        aiType: document.getElementById('aiType').value,
-        placementMode: 'standard'
-    };
-
-    console.log("saveGameStateToSession() - Сохранение состояния:", { ...gameState, ai_settings: aiSettings });
-
-    fetch('/update_state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...gameState, ai_settings: aiSettings })
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        function removeSelectedCards() {
+            console.log("removeSelectedCards() - Начало");
+            const combinationArea = document.getElementById('combination-area');
+            const removedCards = [];
+            
+            // Проверяем, есть ли выбранные слоты
+            const selectedSlots = Array.from(combinationArea.querySelectorAll('.combination-slot.selected'));
+            
+            // Если есть выбранные слоты, удаляем только из них
+            if (selectedSlots.length > 0) {
+                selectedSlots.forEach(slot => {
+                    const card = slot.querySelector('.card');
+                    if (card) {
+                        const cardKey = `${card.dataset.rank}${card.dataset.suit}`;
+                        unavailableCards.delete(cardKey);  // Удаляем из недоступных карт
+                        removedCards.push({ rank: card.dataset.rank, suit: card.dataset.suit });
+                        card.remove();
+                        slot.classList.remove('taken');
+                        slot.classList.remove('selected');
+                    }
+                });
+            } 
+            // Если нет выбранных слотов, удаляем только одну карту из первого слота
+            else {
+                const firstCardSlot = combinationArea.querySelector('.combination-slot.taken');
+                if (firstCardSlot) {
+                    const card = firstCardSlot.querySelector('.card');
+                    if (card) {
+                        const cardKey = `${card.dataset.rank}${card.dataset.suit}`;
+                        unavailableCards.delete(cardKey);
+                        removedCards.push({ rank: card.dataset.rank, suit: card.dataset.suit });
+                        card.remove();
+                        firstCardSlot.classList.remove('taken');
+                    }
+                }
+            }
+            
+            updateSelectorAvailability();
+            
+            // Сообщаем серверу об удалении карт
+            if (removedCards.length > 0) {
+                fetch('/update_state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...getGameStateFromDOM(),
+                        removed_cards: removedCards,
+                        ai_settings: getAiSettings()
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error("Ошибка при обновлении состояния:", data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('removeSelectedCards() - Ошибка:', error);
+                });
+            }
+            
+            console.log("removeSelectedCards() - Конец. Удалено карт:", removedCards.length);
         }
-        console.log("saveGameStateToSession() - Состояние успешно сохранено.");
-    })
-    .catch(error => {
-        console.error('saveGameStateToSession() - Ошибка:', error);
-    });
-    }
+
+        function resetTraining() {
+            console.log("resetTraining() - Начало");
+            setupTable();
+            resetCombinationArea();
+
+            unavailableCards.clear();
+            discardedCards.clear(); // Очищаем discardedCards при сбросе
+            selectedRank = null;
+            selectedSuit = null;
+            document.querySelectorAll('.selector-item').forEach(el => el.classList.remove('selected', 'unavailable'));
+            document.querySelectorAll('.card-slot').forEach(slot => {
+                slot.classList.remove('taken');
+                const card = slot.querySelector('.card');
+                if (card) {
+                    card.remove();
+                }
+            });
+
+            document.querySelectorAll('.royalty-animation').forEach(el => {
+                el.classList.remove('show');
+                el.textContent = '';
+            });
+            document.getElementById('total-royalty').textContent = '';
+
+            fetch('/update_state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    selected_cards: [],
+                    board: { top: [], middle: [], bottom: [] },
+                    discarded_cards: [],
+                    removed_cards: [],
+                    ai_settings: {
+                        fantasyType: document.getElementById('fantasyType').value,
+                        fantasyMode: document.getElementById('fantasyMode').checked,
+                        aiTime: document.getElementById('aiTime').value,
+                        iterations: document.getElementById('iterations').value,
+                        stopThreshold: document.getElementById('stopThreshold').value,
+                        aiType: document.getElementById('aiType').value,
+                        placementMode: 'standard'
+                    }
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                console.log("resetTraining() - Сервер: Состояние игры успешно сброшено.");
+            })
+            .catch(error => {
+                console.error('resetTraining() - Ошибка сброса состояния игры:', error);
+                alert('Произошла ошибка при сбросе состояния.');
+            });
+            console.log("resetTraining() - Конец. Тренировка сброшена.");
+        }
+
+        function isCardOnBoard(card) {
+            const board = getGameStateFromDOM().board;
+            for (const line in board) {
+                if (board[line].some(c => c && c.rank === card.rank && c.suit === card.suit)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function displayRoyalties(royalties) {
+            console.log("displayRoyalties() - Начало. royalties:", royalties);
+            const lines = ['top', 'middle', 'bottom'];
+            lines.forEach(line => {
+                const royaltyValue = royalties[line];
+                if (royaltyValue > 0) {
+                    const row = document.getElementById(`${line}-row`);
+                    const slots = row.querySelectorAll('.card-slot');
+                    const lastSlot = slots[slots.length - 1];
+
+                    const royaltyAnimation = lastSlot.querySelector('.royalty-animation');
+                    if (royaltyAnimation) {
+                        royaltyAnimation.textContent = `+${royaltyValue}`;
+                        royaltyAnimation.classList.remove('show');
+                        requestAnimationFrame(() => {
+                            royaltyAnimation.classList.add('show');
+                        });
+
+                        setTimeout(() => {
+                            royaltyAnimation.classList.remove('show');
+                        }, 3000);
+                    }
+                }
+            });
+            console.log("displayRoyalties() - Конец. Роялти отображены.");
+        }
+
+        function displayTotalRoyalty(totalRoyalty) {
+            console.log("displayTotalRoyalty() - Начало. totalRoyalty:", totalRoyalty);
+            const totalRoyaltyElement = document.getElementById('total-royalty');
+            totalRoyaltyElement.textContent = `Total Royalty: ${totalRoyalty}`;
+            console.log("displayTotalRoyalty() - Конец. Общая роялти отображена.");
+        }
+
+        function saveGameStateToSession() {
+            console.log("saveGameStateToSession() - Начало");
+            const gameState = getGameStateFromDOM();
+            const aiSettings = {
+                fantasyType: document.getElementById('fantasyType').value,
+                fantasyMode: document.getElementById('fantasyMode').checked,
+                aiTime: document.getElementById('aiTime').value,
+                iterations: document.getElementById('iterations').value,
+                stopThreshold: document.getElementById('stopThreshold').value,
+                aiType: document.getElementById('aiType').value,
+                placementMode: 'standard'
+            };
+
+            console.log("saveGameStateToSession() - Сохранение состояния:", { ...gameState, ai_settings: aiSettings });
+
+            fetch('/update_state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...gameState, ai_settings: aiSettings })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                console.log("saveGameStateToSession() - Состояние успешно сохранено.");
+            })
+            .catch(error => {
+                console.error('saveGameStateToSession() - Ошибка:', error);
+            });
+        }
 
         function saveSettings() {
             console.log("saveSettings() - Начало");
