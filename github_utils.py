@@ -104,8 +104,4 @@ def load_ai_progress_from_github(filename: str = AI_PROGRESS_FILENAME) -> bool:
             logger.info(f"Progress file {filename} not found in GitHub repository.")
             return False
         else:
-            logger.error(f"GitHub API error loading progress: status={e.status}, data={e.data}")
-            return False
-    except Exception as e:
-        logger.exception(f"Unexpected error during loading from GitHub: {e}")
-        return False
+            logger.error(f
