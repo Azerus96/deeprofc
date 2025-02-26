@@ -275,10 +275,15 @@ def ai_move():
         
         if is_terminal_before:
             # Если игра уже завершена, рассчитываем роялти и сохраняем прогресс
-            payoff = game_state.get_payoff()
             royalties = game_state.calculate_royalties()
-            total_royalty = sum(royalties.values())
-            logger.info(f"Игра окончена. Выплата: {payoff}, Роялти: {royalties}, Всего: {total_royalty}")
+            
+            # Проверяем, есть ли фол
+            if royalties.get("foul", False):
+                total_royalty = "Фол"  # Вместо числа возвращаем строку "Фол"
+            else:
+                total_royalty = royalties.get("total", 0)
+                
+            logger.info(f"Игра окончена. Роялти: {royalties}, Всего: {total_royalty}")
 
             # Сохранение прогресса AI (для MCCFR)
             if cfr_agent and ai_settings.get("aiType") == "mccfr":
@@ -294,7 +299,6 @@ def ai_move():
 
             return jsonify({
                 "message": "Game over",
-                "payoff": payoff,
                 "royalties": royalties,
                 "total_royalty": total_royalty,
                 "game_over": True
@@ -308,7 +312,12 @@ def ai_move():
         if not actions:
             logger.info("Нет доступных ходов, но игра не в терминальном состоянии. Считаем игру завершенной.")
             royalties = game_state.calculate_royalties()
-            total_royalty = sum(royalties.values())
+            
+            # Проверяем, есть ли фол
+            if royalties.get("foul", False):
+                total_royalty = "Фол"  # Вместо числа возвращаем строку "Фол"
+            else:
+                total_royalty = royalties.get("total", 0)
             
             # Сохранение прогресса AI (для MCCFR)
             if cfr_agent and ai_settings.get("aiType") == "mccfr":
@@ -368,10 +377,15 @@ def ai_move():
         
         # Если игра завершена после хода, рассчитываем роялти и сохраняем прогресс
         if is_terminal_after:
-            payoff = next_game_state.get_payoff()
             royalties = next_game_state.calculate_royalties()
-            total_royalty = sum(royalties.values())
-            logger.info(f"Игра окончена после хода. Выплата: {payoff}, Роялти: {royalties}, Всего: {total_royalty}")
+            
+            # Проверяем, есть ли фол
+            if royalties.get("foul", False):
+                total_royalty = "Фол"  # Вместо числа возвращаем строку "Фол"
+            else:
+                total_royalty = royalties.get("total", 0)
+                
+            logger.info(f"Игра окончена после хода. Роялти: {royalties}, Всего: {total_royalty}")
             
             # Сохранение прогресса AI (для MCCFR)
             if cfr_agent and ai_settings.get("aiType") == "mccfr":
@@ -389,8 +403,7 @@ def ai_move():
                 "move": serialize_move(move),
                 "royalties": royalties,
                 "total_royalty": total_royalty,
-                "game_over": True,
-                "payoff": payoff
+                "game_over": True
             }), 200
         else:
             # Если игра не завершена, возвращаем только ход без роялти
