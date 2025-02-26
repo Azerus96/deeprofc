@@ -405,15 +405,15 @@ class GameState:
 
         return f"T:{top_str}|M:{middle_str}|B:{bottom_str}|D:{discarded_str}|S:{selected_str}"
 
-    def get_payoff(self) -> Dict[str, int]:
+    def get_payoff(self) -> int:
         """Calculates the payoff for the current state."""
         if not self.is_terminal():
             raise ValueError("Game is not in a terminal state")
 
         if self.is_dead_hand():
-            return -self.calculate_royalties()
+            return -1000  # Большой штраф за фол
 
-        return self.calculate_royalties()
+        return self.calculate_royalties().get("total", 0)
 
     def is_dead_hand(self) -> bool:
         """Checks if the hand is a dead hand (invalid combination order)."""
@@ -424,56 +424,96 @@ class GameState:
         middle_rank, _ = self.evaluate_hand(self.board.middle)
         bottom_rank, _ = self.evaluate_hand(self.board.bottom)
 
-        return top_rank > middle_rank or middle_rank > bottom_rank
-
-    def get_line_royalties(self, line: str) -> int:
-        """Calculates royalties for a specific line."""
-        cards = getattr(self.board, line)
-        if not cards:
-            return 0
-
-        rank, _ = self.evaluate_hand(cards)
-        if line == "top":
-            if rank == 7:
-                return 10 + Card.RANKS.index(cards[0].rank)
-            elif rank == 8:
-                return self.get_pair_bonus(cards)
-            elif rank == 9:
-                return self.get_high_card_bonus(cards)
-        elif line == "middle":
-            if rank <= 6:
-                return self.get_royalties_for_hand(rank) * 2
-        elif line == "bottom":
-            if rank <= 6:
-                return self.get_royalties_for_hand(rank)
-        return 0
+        # По правилам, верхняя линия не должна быть сильнее средней,
+        # а средняя не должна быть сильнее нижней
+        # rank МЕНЬШЕ = комбинация СИЛЬНЕЕ (1 = роял-флеш, 10 = хай-кард)
+        return top_rank < middle_rank or middle_rank < bottom_rank
 
     def calculate_royalties(self) -> Dict[str, int]:
         """Calculates royalties for the current state based on the rules."""
         if self.is_dead_hand():
-            return 0
+            # При фоле роялти не начисляются, возвращаем специальное значение
+            return {"top": 0, "middle": 0, "bottom": 0, "total": 0, "foul": True}
 
-        royalties = {}
-        lines = {"top": self.board.top, "middle": self.board.middle, "bottom": self.board.bottom}
-
-        for line_name, cards in lines.items():
+        royalties = {"top": 0, "middle": 0, "bottom": 0, "foul": False}
+        
+        # Рассчитываем роялти для каждой линии
+        for line_name in ["top", "middle", "bottom"]:
             royalties[line_name] = self.get_line_royalties(line_name)
-
+        
+        # Общая сумма роялти
+        royalties["total"] = sum(royalties[line] for line in ["top", "middle", "bottom"])
+        
         return royalties
 
-    def get_royalties_for_hand(self, hand_rank: int) -> int:
-        if hand_rank == 1:
-            return 25
-        elif hand_rank == 2:
-            return 15
-        elif hand_rank == 3:
-            return 10
-        elif hand_rank == 4:
-            return 6
-        elif hand_rank == 5:
-            return 4
-        elif hand_rank == 6:
-            return 2
+    def get_line_royalties(self, line: str) -> int:
+        """Calculates royalties for a specific line based on American rules."""
+        cards = getattr(self.board, line)
+        if not cards or len(cards) == 0:
+            return 0
+
+        rank, _ = self.evaluate_hand(cards)
+        
+        # Верхняя линия
+        if line == "top":
+            # Проверка на сет (три одинаковые карты)
+            if rank == 7:  # Сет
+                set_rank = cards[0].rank  # В сете все карты одного ранга
+                set_values = {
+                    "2": 10, "3": 11, "4": 12, "5": 13, "6": 14, "7": 15, 
+                    "8": 16, "9": 17, "10": 18, "J": 19, "Q": 20, "K": 21, "A": 22
+                }
+                return set_values.get(set_rank, 0)
+            
+            # Проверка на пару
+            elif rank == 8:  # Пара
+                # Находим ранг пары
+                ranks = [card.rank for card in cards]
+                pair_rank = None
+                for r in ranks:
+                    if ranks.count(r) == 2:
+                        pair_rank = r
+                        break
+                        
+                if pair_rank:
+                    pair_values = {
+                        "6": 1, "7": 2, "8": 3, "9": 4, "10": 5, 
+                        "J": 6, "Q": 7, "K": 8, "A": 9
+                    }
+                    return pair_values.get(pair_rank, 0)
+            
+        # Средняя линия
+        elif line == "middle":
+            if rank == 7:  # Сет
+                return 2
+            elif rank == 6:  # Стрит
+                return 4
+            elif rank == 5:  # Флеш
+                return 8
+            elif rank == 4:  # Фулл-хаус
+                return 12
+            elif rank == 3:  # Каре
+                return 20
+            elif rank == 2:  # Стрит-флеш
+                return 30
+            elif rank == 1:  # Роял-флеш
+                return 50
+                
+        # Нижняя линия
+        elif line == "bottom":
+            if rank == 6:  # Стрит
+                return 2
+            elif rank == 5:  # Флеш
+                return 4
+            elif rank == 4:  # Фулл-хаус
+                return 6
+            elif rank == 3:  # Каре
+                return 10
+            elif rank == 2:  # Стрит-флеш
+                return 15
+            elif rank == 1:  # Роял-флеш
+                return 25
+                
         return 0
 
     def get_line_score(self, line: str, cards: List[Card]) -> int:
@@ -698,6 +738,10 @@ class CFRAgent:
         if game_state.is_terminal():
             payoff = game_state.get_payoff()
             logger.debug(f"cfr called in terminal state. Payoff: {payoff}")
+            
+            # Если это фол, усиливаем штраф для регретов
+            if game_state.is_dead_hand():
+                return -1500  # Усиленный штраф за фол для регретов
             return payoff
 
         player = game_state.get_current_player()
